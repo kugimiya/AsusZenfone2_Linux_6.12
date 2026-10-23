@@ -1,0 +1,41 @@
+# Reference: <https://postmarketos.org/devicepkg>
+maintainer="kugichka <kugichka@example.com>"
+pkgname=device-asus-z00e
+pkgdesc="Asus Zenfone 2 Laser ZE500KL"
+pkgver=1
+pkgrel=0
+url="https://postmarketos.org"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="
+	firmware-asus-z00e-wcnss-nv
+	firmware-qcom-adreno-a300
+	linux-postmarketos-qcom-msm8916
+	mkbootimg
+	msm-firmware-loader
+	msm-firmware-loader-wcnss
+	postmarketos-base
+	soc-qcom-msm8916
+	soc-qcom-msm8916-rproc
+"
+makedepends="devicepkg-dev"
+source="
+	deviceinfo
+	kernel-cmdline.conf
+	modules-initfs
+"
+
+build() {
+	devicepkg_build $startdir $pkgname
+}
+
+package() {
+	devicepkg_package $startdir $pkgname
+}
+
+sha512sums="
+1659b19b36438e3c495cbfeaa6f3c15beee9aedea9e09bb81ec084d3517da0748beaf71a21969ba632360cf1dbd2ace8643eee7c256c7cfe4e9dfca005c72131  deviceinfo
+37e1e5f8839b624ab3eb850a24ed4daeb61a651257a1fb593f49cb869323e5d1b339c831a18eb26a9d7bd0a618ea9eb2bb9bf3882133af5f2606a878e6d39c67  kernel-cmdline.conf
+ec5dda5d433efb1099e8850197b2622253a7b80459e324c459f129cd4c8c04018d24daab760bcececdc692387b70cc020723c087ae719ddfbad1b1fc71625bbe  modules-initfs
+"

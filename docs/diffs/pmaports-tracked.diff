@@ -1,0 +1,58 @@
+diff --git a/device/testing/linux-postmarketos-qcom-msm8916/APKBUILD b/device/testing/linux-postmarketos-qcom-msm8916/APKBUILD
+index dd39c46..d3c7ebe 100644
+--- a/device/testing/linux-postmarketos-qcom-msm8916/APKBUILD
++++ b/device/testing/linux-postmarketos-qcom-msm8916/APKBUILD
+@@ -6,7 +6,7 @@ pkgver=6.12.1
+ # When making kernel config changes please also submit a PR to
+ # https://github.com/msm8916-mainline/linux/blob/master/kernel/configs/pmos.config
+ # since the kernel config is regenerated on upgrades and all changes will be lost!
+-pkgrel=7
++pkgrel=9
+ pkgdesc="Mainline kernel fork for Qualcomm MSM8909/MSM8916/MSM8939 devices"
+ arch="aarch64 armv7"
+ url="https://github.com/msm8916-mainline/linux"
+@@ -50,6 +50,8 @@ source="
+ 	config-$_flavor.aarch64
+ 	config-$_flavor.armv7
+ 	0001-kbuild-Add-fno-builtin-wcslen.patch
++	0002-asus-z00e-display-touch.patch
++	0003-qcom-scm-pas-strongly-ordered-metadata.patch
+ "
+ builddir="$srcdir/linux-${_tag#v}"
+ 
+@@ -100,7 +102,9 @@ package() {
+ 
+ sha512sums="
+ e46fecfdab77f26c5127ddfd057d31bdf441da7fbf233cd574b396e762ea8992af65f577c595bab6761d1d339016733eb3ab652bf3a221e8b1f6bad4aa6adef5  linux-postmarketos-qcom-msm8916-v6.12.1-msm8916.tar.gz
+-67b6141ad2d3634177194a1ae58f08566a9dd33936c9a5d429bad785320c7b9bf1c676ba1cedf438d235413195fb15236867ccfc3310cf5a77a4bce4781fb8e4  config-postmarketos-qcom-msm8916.aarch64
+-e214ff15285f90e1978c68a1872371b7b44db0f65afd347eeb87ba0a237ee6fa46d2280c72efa2ccf6d055e0d4ddb9cb5e00242c5bb44955a13e3c6db6b53d95  config-postmarketos-qcom-msm8916.armv7
++f7f08d64cde3031f7cd325b9dc8f70b06eb26129890c7b316322e1e6aa3d90b6f1cc37a0a200b033ecd9dbf3a56e68f69620205aaa75d935ad02005648a18816  config-postmarketos-qcom-msm8916.aarch64
++4c806ef0ebc412f203d55ead239efe81d2c71997ae5ef04929365c0710b247a165f975cb72c2771c6e65900324ced0147e1c7c65da29d9eb0fff19f7a0de9710  config-postmarketos-qcom-msm8916.armv7
+ 2a5c20bd9da57e42767fa70eb1aa27623e4013b5dadc3f35508e1497fb4bfd53d8775c372eea8c4d95bd12eff43f23c7a4acfb219313dcb7915643804fc73cb2  0001-kbuild-Add-fno-builtin-wcslen.patch
++18cfc98e795d7112431fc75aba0675d4363e2a8499d73c7cd17e9dab9cbda6047bbfc7ba68335a7ced027bdafcb7b88aef01aceac67e2266088a944550403a1c  0002-asus-z00e-display-touch.patch
++ab714f40284435c524db0986705342137021e78fe7df65ff271ae825723566145ef23a35d86f9ae3cdaafd4e99e063dd2920a525b1a4f4af8b9e0edabaaa836b  0003-qcom-scm-pas-strongly-ordered-metadata.patch
+ "
+diff --git a/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.aarch64 b/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.aarch64
+index 78cc439..e05ea28 100644
+--- a/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.aarch64
++++ b/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.aarch64
+@@ -3878,6 +3878,7 @@ CONFIG_DRM_PANEL_ALCATEL_AUO_HX8394D=m
+ CONFIG_DRM_PANEL_ALCATEL_IDOL3_NT35596=m
+ CONFIG_DRM_PANEL_ALCATEL_IDOL3_R63315=m
+ CONFIG_DRM_PANEL_ASUS_Z00L_OTM1284A=m
++CONFIG_DRM_PANEL_ASUS_Z00E_AUO_RM68200=m
+ CONFIG_DRM_PANEL_ASUS_Z010D_R69339=m
+ CONFIG_DRM_PANEL_GPLUS_FL8005A_HX8394D=m
+ CONFIG_DRM_PANEL_HUAWEI_BOE_OTM8019A=m
+diff --git a/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.armv7 b/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.armv7
+index cda0996..9c512f5 100644
+--- a/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.armv7
++++ b/device/testing/linux-postmarketos-qcom-msm8916/config-postmarketos-qcom-msm8916.armv7
+@@ -3739,6 +3739,7 @@ CONFIG_DRM_PANEL_ALCATEL_AUO_HX8394D=m
+ CONFIG_DRM_PANEL_ALCATEL_IDOL3_NT35596=m
+ CONFIG_DRM_PANEL_ALCATEL_IDOL3_R63315=m
+ CONFIG_DRM_PANEL_ASUS_Z00L_OTM1284A=m
++CONFIG_DRM_PANEL_ASUS_Z00E_AUO_RM68200=m
+ CONFIG_DRM_PANEL_ASUS_Z010D_R69339=m
+ CONFIG_DRM_PANEL_GPLUS_FL8005A_HX8394D=m
+ CONFIG_DRM_PANEL_HUAWEI_BOE_OTM8019A=m

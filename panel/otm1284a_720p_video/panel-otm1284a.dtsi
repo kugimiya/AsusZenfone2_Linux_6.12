@@ -1,0 +1,26 @@
+&mdss_dsi0 {
+	panel@0 {
+		compatible = "mdss,otm1284a";
+		reg = <0>;
+
+		backlight = <&backlight>;
+		vdd-supply = <&...>;
+		vddio-supply = <&...>;
+		reset-gpios = <&tlmm XY GPIO_ACTIVE_LOW>;
+
+		port {
+			panel_in: endpoint {
+				remote-endpoint = <&mdss_dsi0_out>;
+			};
+		};
+	};
+};
+
+&mdss_dsi0_out {
+	data-lanes = <0 1 2 3>;
+	remote-endpoint = <&panel_in>;
+};
+
+&mdss_dsi0_phy {
+	qcom,dsi-phy-regulator-ldo-mode;
+};

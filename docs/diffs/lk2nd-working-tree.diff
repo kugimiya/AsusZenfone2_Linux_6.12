@@ -1,0 +1,29 @@
+diff --git a/lk2nd/device/dts/msm8916/msm8916-asus-z00e.dts b/lk2nd/device/dts/msm8916/msm8916-asus-z00e.dts
+index 1125be2..bec42f9 100644
+--- a/lk2nd/device/dts/msm8916/msm8916-asus-z00e.dts
++++ b/lk2nd/device/dts/msm8916/msm8916-asus-z00e.dts
+@@ -4,15 +4,21 @@
+ #include <lk2nd.dtsi>
+ 
+ / {
+-	qcom,msm-id = <QCOM_ID_MSM8916 0>;
+-	qcom,board-id = <24 0>;
++	/* SoC and board ids from the Lineage boot image for ZE500KL.
++	 * 8916 production units use board-id 24 (ZE500KL PR); 21-23 are
++	 * earlier builds. 8929/8939 ids are the other DTBs in that image.
++	 */
++	qcom,msm-id = <0xce 0x00 0xf8 0x00 0xf9 0x00 0xfa 0x00 239 0 241 0 263 0 268 0>;
++	qcom,board-id = <20 0>, <21 0>, <22 0>, <23 0>, <24 0>,
++			<30 0>, <31 0>, <32 0>, <33 0>,
++			<22 1>, <23 1>, <24 1>, <40 1>;
+ };
+ 
+ &lk2nd {
+ 	model = "Asus Zenfone 2 Laser ZE500KL";
+ 	compatible = "asus,z00e";
+ 
+-	// FIXME: lk2nd,dtb-files = "msm8916-asus-z00e";
++	lk2nd,dtb-files = "msm8916-asus-z00e";
+ 
+ 	gpio-keys {
+ 		compatible = "gpio-keys";

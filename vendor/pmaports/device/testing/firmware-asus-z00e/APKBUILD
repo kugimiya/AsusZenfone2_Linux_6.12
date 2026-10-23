@@ -1,0 +1,25 @@
+maintainer="kugichka <kugichka@example.com>"
+pkgname=firmware-asus-z00e
+pkgver=1
+pkgrel=0
+pkgdesc="Firmware for Asus Zenfone 2 Laser ZE500KL"
+url="https://postmarketos.org"
+subpackages="$pkgname-wcnss-nv:wcnss_nv"
+arch="aarch64"
+license="proprietary"
+options="!check !strip !archcheck !tracedeps"
+source="WCNSS_qcom_wlan_nv.bin"
+
+package() {
+	mkdir -p "$pkgdir"
+}
+
+wcnss_nv() {
+	pkgdesc="Asus Zenfone 2 Laser ZE500KL WiFi calibration"
+	install -Dm644 "$srcdir"/WCNSS_qcom_wlan_nv.bin \
+		"$subpkgdir"/usr/lib/firmware/wlan/prima/WCNSS_qcom_wlan_nv.bin
+}
+
+sha512sums="
+aa41bc08ee5b20382881205e15539a43f1d4a060034808da301ab2474f27ea3541d1adbd6fb07950bb28156743e2952c228eeb1a49c8c16f4d47e522f20a6aec  WCNSS_qcom_wlan_nv.bin
+"

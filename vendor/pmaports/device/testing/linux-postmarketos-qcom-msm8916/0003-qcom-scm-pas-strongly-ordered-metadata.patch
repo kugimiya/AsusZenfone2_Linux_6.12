@@ -1,0 +1,316 @@
+--- a/drivers/firmware/qcom/qcom_scm.c
++++ b/drivers/firmware/qcom/qcom_scm.c
+@@ -30,6 +30,13 @@
+ #include <linux/sizes.h>
+ #include <linux/types.h>
+ 
++#include <linux/mm.h>
++#include <linux/set_memory.h>
++#ifdef CONFIG_ARM64
++#include <asm/barrier.h>
++#include <asm/cacheflush.h>
++#endif
++
+ #include "qcom_scm.h"
+ #include "qcom_tzmem.h"
+ 
+@@ -555,6 +562,158 @@
+ 		dev_err(__scm->dev, "failed to set download mode: %d\n", ret);
+ }
+ 
++#ifdef CONFIG_ARM64
++struct qcom_scm_pas_mt_data {
++	u64 mt;
++	bool to_device;
++};
++
++static int qcom_scm_pas_set_mt_pte(pte_t *ptep, unsigned long addr, void *data)
++{
++	struct qcom_scm_pas_mt_data *chg = data;
++	pte_t pte = __ptep_get(ptep);
++
++	(void)addr;
++	pte = clear_pte_bit(pte, __pgprot(PTE_ATTRINDX_MASK));
++	pte = set_pte_bit(pte, __pgprot(PTE_ATTRINDX(chg->mt)));
++	/*
++	 * A clean linear-map page has PTE_RDONLY set. A store would fault
++	 * and dirty it. Device-nGnRnE must be written without that fault.
++	 */
++	if (chg->to_device) {
++		pte = clear_pte_bit(pte, __pgprot(PTE_RDONLY));
++		pte = set_pte_bit(pte, __pgprot(PTE_WRITE | PTE_DIRTY | PTE_AF));
++	}
++	__set_pte(ptep, pte);
++	return 0;
++}
++
++/*
++ * arm64 set_memory_* / set_direct_map_* cannot retarget a page to
++ * MT_DEVICE_nGnRnE (pgprot_noncached()). ioremap_prot() refuses system
++ * RAM, and vmap/ioremap would add a second alias over the cacheable
++ * linear map. That alias is architecturally mismatched and hangs TZ.
++ *
++ * When can_set_direct_map() is true the linear map is already
++ * page-granular, so no live block mapping is split. Break-before-make
++ * is required: pgattr_change_is_safe() rejects a live Normal -> Device
++ * attribute change. One mapping remains: the linear map itself.
++ *
++ * Returns 0 when the requested type is installed and valid. On failure
++ * the PTEs may be invalid; the caller must not free the pages unless a
++ * later call with to_device=false returns 0.
++ */
++static int qcom_scm_pas_set_linear_mt(void *ptr, size_t len, bool to_device)
++{
++	unsigned long addr = (unsigned long)ptr;
++	int numpages = len >> PAGE_SHIFT;
++	struct qcom_scm_pas_mt_data chg = {
++		.mt = to_device ? MT_DEVICE_nGnRnE : MT_NORMAL,
++		.to_device = to_device,
++	};
++	int ret;
++
++	if (!numpages || !PAGE_ALIGNED(addr) || !PAGE_ALIGNED(len))
++		return -EINVAL;
++
++	if (to_device) {
++		dcache_clean_inval_poc(addr, addr + len);
++		dsb(ish);
++		isb();
++	}
++
++	ret = set_memory_valid(addr, numpages, 0);
++	if (ret)
++		return ret;
++
++	ret = apply_to_existing_page_range(&init_mm, addr, len,
++					   qcom_scm_pas_set_mt_pte, &chg);
++	if (ret) {
++		set_memory_valid(addr, numpages, 1);
++		return ret;
++	}
++
++	return set_memory_valid(addr, numpages, 1);
++}
++
++/* Device-nGnRnE forbids unaligned and merged accesses. */
++static void qcom_scm_pas_write_ordered(void *dst, const void *src, size_t len)
++{
++	volatile u8 *d = dst;
++	const u8 *s = src;
++	size_t i;
++
++	for (i = 0; i < len; i++)
++		d[i] = s[i];
++	dsb(sy);
++}
++
++static void *qcom_scm_pas_alloc_ordered(size_t size, size_t *alloc_size,
++					dma_addr_t *phys, const char **map_change)
++{
++	struct page *page;
++	unsigned int order;
++	void *ptr;
++	int ret;
++
++	*map_change = "skipped";
++	if (!size || !can_set_direct_map())
++		return NULL;
++
++	/* alloc_pages() rounds up to a power-of-two number of pages. */
++	order = get_order(size);
++	*alloc_size = (size_t)PAGE_SIZE << order;
++	page = alloc_pages(GFP_KERNEL, order);
++	if (!page) {
++		*map_change = "failed";
++		return NULL;
++	}
++
++	ptr = page_address(page);
++	ret = qcom_scm_pas_set_linear_mt(ptr, *alloc_size, true);
++	if (ret) {
++		pr_info("qcom-scm-pas: Device-nGnRnE linear map failed (%d)\n",
++			ret);
++		if (!qcom_scm_pas_set_linear_mt(ptr, *alloc_size, false))
++			__free_pages(page, order);
++		else
++			pr_info("qcom-scm-pas: leaking %zu bytes after failed map\n",
++				*alloc_size);
++		*map_change = "failed";
++		return NULL;
++	}
++
++	*phys = page_to_phys(page);
++	*map_change = "ok";
++	return ptr;
++}
++
++static void qcom_scm_pas_free_ordered(void *ptr, size_t alloc_size)
++{
++	if (qcom_scm_pas_set_linear_mt(ptr, alloc_size, false)) {
++		pr_info("qcom-scm-pas: failed to restore Normal linear map, leaking %zu bytes\n",
++			alloc_size);
++		return;
++	}
++
++	__free_pages(virt_to_page(ptr), get_order(alloc_size));
++}
++#endif /* CONFIG_ARM64 */
++
++static void qcom_scm_pas_free_metadata(bool ordered, size_t size, void *buf,
++				       dma_addr_t phys)
++{
++#ifdef CONFIG_ARM64
++	if (ordered) {
++		qcom_scm_pas_free_ordered(buf, size);
++		return;
++	}
++#else
++	(void)ordered;
++#endif
++	dma_free_coherent(__scm->dev, size, buf, phys);
++}
++
+ /**
+  * qcom_scm_pas_init_image() - Initialize peripheral authentication service
+  *			       state machine for a given peripheral, using the
+@@ -575,9 +734,15 @@
+ int qcom_scm_pas_init_image(u32 peripheral, const void *metadata, size_t size,
+ 			    struct qcom_scm_pas_metadata *ctx)
+ {
+-	dma_addr_t mdata_phys;
+-	void *mdata_buf;
++	dma_addr_t mdata_phys = 0;
++	void *mdata_buf = NULL;
++	size_t alloc_size = size;
++	bool ordered = false;
++	const char *map_change = "skipped";
++	const char *allocator = "dma_alloc_coherent";
++	u8 mag[4] = { };
+ 	int ret;
++	int caller_ret;
+ 	struct qcom_scm_desc desc = {
+ 		.svc = QCOM_SCM_SVC_PIL,
+ 		.cmd = QCOM_SCM_PIL_PAS_INIT_IMAGE,
+@@ -585,7 +750,7 @@
+ 		.args[0] = peripheral,
+ 		.owner = ARM_SMCCC_OWNER_SIP,
+ 	};
+-	struct qcom_scm_res res;
++	struct qcom_scm_res res = { };
+ 
+ 	/*
+ 	 * During the scm call memory protection will be enabled for the meta
+@@ -598,13 +763,44 @@
+ 	 *
+ 	 * If we pass a buffer that is already part of an SHM Bridge to this
+ 	 * call, it will fail.
++	 *
++	 * msm8916 TZ also requires the NS mapping of this buffer to be
++	 * strongly ordered (Device-nGnRnE). dma_alloc_coherent() is only
++	 * Normal Non-cacheable on arm64, so try the linear-map retarget
++	 * first and fall back to the coherent buffer if it cannot be done.
+ 	 */
+-	mdata_buf = dma_alloc_coherent(__scm->dev, size, &mdata_phys,
+-				       GFP_KERNEL);
+-	if (!mdata_buf)
+-		return -ENOMEM;
++#ifdef CONFIG_ARM64
++	mdata_buf = qcom_scm_pas_alloc_ordered(size, &alloc_size, &mdata_phys,
++					       &map_change);
++	if (mdata_buf) {
++		ordered = true;
++		allocator = "linear-device-ngnrne";
++		qcom_scm_pas_write_ordered(mdata_buf, metadata, size);
++	}
++#endif
++	if (!mdata_buf) {
++		mdata_buf = dma_alloc_coherent(__scm->dev, size, &mdata_phys,
++					       GFP_KERNEL);
++		alloc_size = size;
++		if (!mdata_buf) {
++			pr_info("qcom-scm-pas: peripheral=%u allocator=none size=%zu map_change=%s errno=%d\n",
++				peripheral, size, map_change, -ENOMEM);
++			return -ENOMEM;
++		}
++		memcpy(mdata_buf, metadata, size);
++	}
+ 
+-	memcpy(mdata_buf, metadata, size);
++	if (size >= 4) {
++		const volatile u8 *p = mdata_buf;
++
++		mag[0] = p[0];
++		mag[1] = p[1];
++		mag[2] = p[2];
++		mag[3] = p[3];
++	}
++	pr_info("qcom-scm-pas: peripheral=%u allocator=%s size=%zu alloc_size=%zu phys=%pad map_change=%s magic=%02x %02x %02x %02x\n",
++		peripheral, allocator, size, alloc_size, &mdata_phys,
++		map_change, mag[0], mag[1], mag[2], mag[3]);
+ 
+ 	ret = qcom_scm_clk_enable();
+ 	if (ret)
+@@ -623,15 +819,20 @@
+ 	qcom_scm_clk_disable();
+ 
+ out:
++	caller_ret = ret ? ret : (int)res.result[0];
++	pr_info("qcom-scm-pas: peripheral=%u errno=%d\n", peripheral, caller_ret);
++
+ 	if (ret < 0 || !ctx) {
+-		dma_free_coherent(__scm->dev, size, mdata_buf, mdata_phys);
++		qcom_scm_pas_free_metadata(ordered, alloc_size, mdata_buf,
++					   mdata_phys);
+ 	} else if (ctx) {
+ 		ctx->ptr = mdata_buf;
+ 		ctx->phys = mdata_phys;
+-		ctx->size = size;
++		ctx->size = alloc_size;
++		ctx->strongly_ordered = ordered;
+ 	}
+ 
+-	return ret ? : res.result[0];
++	return caller_ret;
+ }
+ EXPORT_SYMBOL_GPL(qcom_scm_pas_init_image);
+ 
+@@ -644,11 +845,13 @@
+ 	if (!ctx->ptr)
+ 		return;
+ 
+-	dma_free_coherent(__scm->dev, ctx->size, ctx->ptr, ctx->phys);
++	qcom_scm_pas_free_metadata(ctx->strongly_ordered, ctx->size, ctx->ptr,
++				   ctx->phys);
+ 
+ 	ctx->ptr = NULL;
+ 	ctx->phys = 0;
+ 	ctx->size = 0;
++	ctx->strongly_ordered = false;
+ }
+ EXPORT_SYMBOL_GPL(qcom_scm_pas_metadata_release);
+ 
+--- a/drivers/firmware/qcom/qcom_scm-smc.c
++++ b/drivers/firmware/qcom/qcom_scm-smc.c
+@@ -206,6 +206,11 @@
+ 		res->result[2] = smc_res.a3;
+ 	}
+ 
++	if (desc->svc == QCOM_SCM_SVC_PIL &&
++	    desc->cmd == QCOM_SCM_PIL_PAS_INIT_IMAGE)
++		pr_info("qcom-scm-pas: raw smc before remap a0=%#lx a1=%#lx\n",
++			smc_res.a0, smc_res.a1);
++
+ 	return (long)smc_res.a0 ? qcom_scm_remap_error(smc_res.a0) : 0;
+ 
+ }
+--- a/include/linux/firmware/qcom/qcom_scm.h
++++ b/include/linux/firmware/qcom/qcom_scm.h
+@@ -70,6 +70,8 @@
+ 	void *ptr;
+ 	dma_addr_t phys;
+ 	ssize_t size;
++	/* Linear-map pages retargeted to Device-nGnRnE; size is page-rounded. */
++	bool strongly_ordered;
+ };
+ 
+ int qcom_scm_pas_init_image(u32 peripheral, const void *metadata, size_t size,

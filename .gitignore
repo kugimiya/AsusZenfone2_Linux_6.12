@@ -1,0 +1,39 @@
+# Промежуточные объектники, если их положат рядом с экспериментами.
+*.o
+*.ko
+*.mod
+*.mod.c
+*.mod.o
+*.cmd
+
+__pycache__/
+*.pyc
+.cache/
+.DS_Store
+
+# Сборки. В репозитории остаются скрипты scripts/build-*.sh и конфиги kernel/config/.
+images/*.img
+kernel/packages/
+kernel/*.tar.gz
+kernel/*.apk
+vendor/lk2nd/build-*/
+
+# Демо-ключи OpenSSL и MOK чужого архивного порта. Сборке этого телефона не нужны.
+vendor/lk2nd/lib/openssl/apps/ca-key.pem
+vendor/lk2nd/lib/openssl/apps/client.pem
+vendor/lk2nd/lib/openssl/apps/dsa-ca.pem
+vendor/lk2nd/lib/openssl/apps/dsa-pca.pem
+vendor/lk2nd/lib/openssl/apps/pca-key.pem
+vendor/lk2nd/lib/openssl/apps/privkey.pem
+vendor/lk2nd/lib/openssl/apps/rsa8192.pem
+vendor/lk2nd/lib/openssl/apps/s1024key.pem
+vendor/lk2nd/lib/openssl/apps/s512-key.pem
+vendor/lk2nd/lib/openssl/apps/server.pem
+vendor/lk2nd/lib/openssl/apps/server2.pem
+vendor/lk2nd/lib/openssl/android.testssl/server2.pem
+vendor/lk2nd/lib/openssl/crypto/pkcs7/info.pem
+vendor/lk2nd/lib/openssl/crypto/pkcs7/infokey.pem
+vendor/lk2nd/lib/openssl/crypto/pkcs7/server.pem
+vendor/lk2nd/lib/openssl/crypto/pkcs7/t/s.pem
+vendor/lk2nd/lib/openssl/crypto/pkcs7/t/server.pem
+vendor/pmaports/device/archived/linux-xiaomi-latte/MOK.key
