@@ -53,7 +53,7 @@
 
 ## Киоск (Cage) вместо Phosh
 
-Целевой UI: **`postmarketos-ui-cage` + `tinydm`** (autologin uid `10000`), без пароля и без OSK. Сессия: `/usr/share/wayland-sessions/cage-ui.desktop`. Команда киоска: `/etc/cage-ui/10-hello-skia.sh` → `CAGE_UI_COMMAND=/home/user/apps/hello-skia/run.sh`. Установка: `scripts/z00e-kiosk-setup.sh`.
+Целевой UI: **`postmarketos-ui-cage` + `tinydm`** (autologin uid `10000`), без пароля и без OSK. Сессия: `/usr/share/wayland-sessions/cage-ui.desktop`. Команда киоска: `/etc/cage-ui/10-kugikiosk.sh` → `CAGE_UI_COMMAND=/home/user/apps/KugisKiosk/run.sh`. Установка: `scripts/z00e-kiosk-setup.sh`.
 
 Откат на Phosh: `tinydm-set-session -s /usr/share/wayland-sessions/phosh.desktop`, `systemctl unmask/enable greetd`, `disable tinydm`, reboot.
 
@@ -61,9 +61,9 @@ Wi‑Fi после смены UI: соединения NetworkManager должн
 
 ## Графика и приложения
 
-- GPU — Adreno 306 (**Freedreno GLES/EGL**, renderer `FD307`). **Vulkan на железе нет** (Turnip только a6xx+). `skia-canvas` Window/`gpu:true` без Vulkan не взлетит.
-- Hello World: `apps/hello-skia/` → на телефоне `~/apps/hello-skia/`. По умолчанию **GLES** (`presenter_gl.py`); fallback CPU Skia: `HELLO_SKIA_BACKEND=skia-cpu`.
-- Для Phosh (если вернули): app-id = basename `.desktop` = `eco.nura.HelloSkia`.
+- GPU — Adreno 306 (**Freedreno GLES/EGL**, renderer `FD307`). **Vulkan на железе нет** (Turnip только a6xx+).
+- Киоск-апп: `apps/KugisKiosk/` → `~/apps/KugisKiosk/`. Конфиг `~/.kugikiosk.yaml`, контент из `~/.kugikiosk.sh` (строка в `[...]` = border).
+- Старый `apps/hello-skia/` — демо; не используется Cage.
 
 ## Сборка
 

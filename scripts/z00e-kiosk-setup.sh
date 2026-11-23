@@ -1,8 +1,8 @@
 #!/bin/sh
-# Switch z00e from Phosh/greetd to Cage kiosk + Hello Skia (run as root).
+# Switch z00e from Phosh/greetd to Cage kiosk + KugisKiosk (run as root).
 set -eu
 
-APP_DIR="${APP_DIR:-/home/user/apps/hello-skia}"
+APP_DIR="${APP_DIR:-/home/user/apps/KugisKiosk}"
 USER_NAME="${USER_NAME:-user}"
 
 echo "==> packages"
@@ -13,8 +13,10 @@ apk add --no-cache \
   tinydm-systemd \
   cage \
   seatd \
-  py3-opengl \
+  py3-yaml \
+  py3-gobject3 \
   py3-cairo \
+  gtk4.0 \
   mesa-egl \
   mesa-gles \
   mesa-dri-gallium \
@@ -39,15 +41,15 @@ EOF
 fi
 
 mkdir -p /etc/cage-ui
-cat >/etc/cage-ui/10-hello-skia.sh <<EOF
+rm -f /etc/cage-ui/10-hello-skia.sh
+cat >/etc/cage-ui/10-kugikiosk.sh <<EOF
 # Kiosk command for cage-ui-session.sh
 CAGE_UI_COMMAND="$APP_DIR/run.sh"
 export CAGE_UI_COMMAND
-export HELLO_SKIA_BACKEND=gles
-export HELLO_SKIA_TAP_QUIT=0
 # Prefer logind; fall back to seatd if present
 export LIBSEAT_BACKEND="\${LIBSEAT_BACKEND:-logind}"
 export XDG_RUNTIME_DIR="/run/user/10000"
+export HOME="/home/$USER_NAME"
 EOF
 
 # Performance: CPU already performance via tuned; pin GPU
@@ -116,7 +118,7 @@ apk del --no-cache \
   postmarketos-ui-phosh-default-osk \
   2>/dev/null || true
 
-chmod +x "$APP_DIR/run.sh" "$APP_DIR/presenter_gl.py" "$APP_DIR/presenter.py" 2>/dev/null || true
+chmod +x "$APP_DIR/run.sh" "$APP_DIR/kugikiosk.py" 2>/dev/null || true
 chown -R "$USER_NAME:$USER_NAME" "$APP_DIR" 2>/dev/null || true
 
 # DRM access for Cage/seatd
