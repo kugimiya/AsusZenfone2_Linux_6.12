@@ -8,11 +8,11 @@ MSM8916, 4×Cortex-A53, 2 ГиБ ОЗУ, 16 ГиБ eMMC, экран 720×1280. c
 
 Карта памяти: `cd-gpios` GPIO 38, активный низкий. Не копировать с Z00L регулятор SD на GPIO 87, MPU6515 по адресу `0x68` и сброс магнитометра GPIO 112.
 
-Кнопки: громкость вверх GPIO 107, активный низкий. Громкость вниз GPIO 117 взята из lk2nd/z00l. USB ID — GPIO 110.
+Кнопки: громкость вверх GPIO 107, активный низкий. Громкость вниз GPIO 117 взята из lk2nd/z00l. USB ID — GPIO 110. При включении: Vol Up → fastboot, Vol Down → TWRP; без зажатых кнопок — Linux.
 
 Батарея: топливомер `qcom,pm8916-bms-vm`, профиль NVT 2400 мА·ч, 25 °C, верх 4.4 В, отсечка 3.4 В. На последнем успешном чтении было 100 % и 4.4568 В, health Over voltage, статус Discharging. Внешнее зарядное — SMB358 на `blsp_i2c6` (`0x78ba000`), адрес I2C `0x6a`, compatible стока `qcom,smb358-charger`, в mainline `summit,smb358`. OTG GPIO 121, INOK GPIO 20. Драйвер зарядки не включён.
 
-Wi-Fi: `wcn36xx`, iris `qcom,wcn3620`. NV: `firmware/WCNSS_qcom_wlan_nv.bin`, 29816 байт. remoteproc `a204000.remoteproc`, прошивка `wcnss.mdt`, PAS id 6, compatible `qcom,pronto-v2-pil`. SCM-соглашение `smc arm 32`.
+Wi-Fi: `wcn36xx`, iris `qcom,wcn3620`. NV: `firmware/WCNSS_qcom_wlan_nv.bin`, 29816 байт. remoteproc `a204000.remoteproc`, прошивка `wcnss.mdt`, PAS id 6, compatible `qcom,pronto-v2-pil`. SCM-соглашение `smc arm 32`. `wcnss_mem` в DT: стоковый адрес `0x8bd00000/6MiB` (раньше пробовали pin `0x8b600000`).
 
 Идентификаторы, которые нужны стоковому aboot и lk2nd: msm-id `(206,0)`, `(248,0)`, `(249,0)`, `(250,0)` и запасные для других SoC, которые уже прописаны в DTS lk2nd. Производственный board-id этого аппарата — 24. Без него aboot отвечал `dtb not found`.
 

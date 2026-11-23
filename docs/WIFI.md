@@ -1,28 +1,58 @@
-# Wi-Fi: что уже проверено
+# Wi-Fi / Bluetooth / модем: статус расследования
 
-Симптом один: `qcom_scm_pas_init_image` для PAS id 6 возвращает ошибку, в dmesg это `error -22 initializing firmware wcnss.mdt`. Сырой ответ TrustZone на обычном вызове — `a0 = 0xfffffffe` (`-2`, EINVAL_ARG). `qcom_scm_remap_error` превращает `-2` в `-22`. До `PAS_AUTH_AND_RESET` выполнение не доходит.
+## Короткий вердикт
 
-Оба файла прошивки отклоняются одинаково:
+**Wi-Fi и Bluetooth работают**, если грузить **WCNSS с Android `system` (`/etc/firmware/wcnss.*`)**, а не с раздела modem/`msm-firmware-loader`.
 
-- `experiments/wcnss-modem-test.mdt` — раздел modem, август 2016, тестовые ключи Qualcomm.
-- `experiments/wcnss-system-oem.mdt` — `/system/etc/firmware/wcnss.mdt`, сертификат OEM, OEM_ID `0x0029`. Этим файлом пользовался Android.
+На modem-наборе TrustZone отклоняет `PAS_INIT_IMAGE` (PAS id 6) → `error -22`. На system-наборе: `remoteproc0` → `running`, `wcn36xx` поднимает `wlan0`, `btqcomsmd` → `hci0`. Скан сетей через NetworkManager успешен.
 
-Оба ELF32, сегменты залинкованы на `0x8b600000`, у всех load-сегментов стоит бит relocatable. Стоковый Android на этом телефоне отдавал pronto область `0x8bd00000` размером 6 МиБ, а не `0x8b600000`. Адрес `0x8b600000` — требование нерелоцируемой прошивки на L8150, не раскладка этого аппарата.
+Модем (MSS/`mpss`) в DTB по-прежнему **выключен** (отдельная тема / риск EDL).
 
-Сейчас в DTB зарезервировано `0x8b600000–0x8bbfffff`. `PAS_MEM_SETUP` на это окно и на старое окно `0x86800000` возвращает 0 и не меняет ответ `PAS_INIT_IMAGE`. Адрес загрузки не аргумент `PAS_INIT_IMAGE`.
+## Рабочая конфигурация (2026-11-23)
 
-Также проверено и не лечит `-22`:
+| Компонент | Состояние |
+| --- | --- |
+| Прошивка | Android system `wcnss.mdt` + `.b00`…`.b11` в `/usr/lib/firmware/` |
+| `firmware_class.path` | **пустой** (не `/run/msm-firmware-loader/target`) |
+| Сервис | `z00e-wcnss-fw.service` (после `msm-firmware-loader`) |
+| `remoteproc0` | `running`, WCNSS Version 1.5 1.2 |
+| `wlan0` | up, scan OK (например SSID вокруг телефона видны) |
+| `hci0` | powered on |
 
-- выбор файла прошивки и путь `msm-firmware-loader`;
-- частота crypto clock 80 МГц против 160 МГц;
-- соглашение SCM: два аргумента ARM32 — наименее плохое, три аргумента дают ENOMEM, legacy даёт EIO;
-- SHM bridge. На этом MSM8916 2016 года гипервизор сам не требует моста, а буфер, который уже является мостом, вызов ломает.
+Копия рабочих блобов: [`firmware/wcnss-android-system/`](../firmware/wcnss-android-system/)  
+SHA256 `wcnss.mdt` (system): `c7e793ff6968cc92effaaa1d3b3bdd93e74126a12173133e8968ffcbb4be8bb4`  
+SHA256 `wcnss.mdt` (modem): `085da003583d9061b40e80b60ddd6a065f3fe7d651b37540a182bf12e8ac6eb3` — **не использовать** на mainline.
 
-Опасные пробы, которые не повторять:
+## Почему раньше был `-22`
 
-- страница `GFP` по физическому адресу вроде `0x85d86000`, подставленная указателем метаданных, повесила TrustZone внутри SMC;
-- `mem_setup` по памяти, которую занимает Linux.
+`msm-firmware-loader` подсовывает modem-образ. Он **байтово другой**, чем `/system/etc/firmware` (в т.ч. другой `wcnss.b06`). Ранний вывод «OEM vs modem одинаково падают» был неверным: «OEM» тогда брали неполный/тот же набор.
 
-Патч `vendor/pmaports/device/testing/linux-postmarketos-qcom-msm8916/0003-qcom-scm-pas-strongly-ordered-metadata.patch` пытается отдать метаданные как Device-nGnRnE. Он вызывается только из `qcom_scm_pas_init_image`. На рабочем ядре USB поднимается из initramfs примерно на 2.8 с, а WCNSS доходит до этого вызова примерно на 24 с. Сборка r9 с этим патчем USB не показала, значит загрузка оборвалась раньше вызова. Лога паники нет. Конфиг r9 отличается от r8 только версией clang (23.1.3 → 23.1.4), бинарно это полная пересборка.
+ELF обоих наборов линкуется на `0x8b600000` (relocatable). Адрес `wcnss_mem` (`0x8b6…` / `0x8bd…` / dynamic `0x868…`) **не был корневой причиной** `-22` на `PAS_INIT_IMAGE`.
 
-На телефоне для `msm-firmware-loader` уже лежит постоянный drop-in: `/etc/systemd/system/msm-firmware-loader.service.d/mkdir.conf` с `ExecStartPre=/bin/mkdir -p /run/msm-firmware-loader`.
+## Что опровергнуто (не повторять как фикс `-22`)
+
+- OEM≠modem без проверки хешей; crypto clk 80/160; SCM ABI; SHM bridge;
+- `PAS_MEM_SETUP` до init; **strongly-ordered Device-nGnRnE** (`0003`, `#11`: allocator ok, SMC всё равно `-22` на modem-fw);
+- pin `wcnss_mem` @ `0x8bd00000` как единственный фикс;
+- `lowbounce` / `mem_setup` по RAM Linux.
+
+## Новые стратегии (после SO) — итог
+
+| # | Стратегия | Результат |
+| --- | --- | --- |
+| E | Сверить ELF load vs mem region | FW @ `0x8b600000`, relocatable; stock CMA был `0x8bd…` |
+| F | **Android system vs modem blobs** | **F сработал** |
+| G | Metadata phys / XPU | отложено (не нужно при system-fw) |
+| H | Iris/XO до PAS | отложено |
+| I | Z00L DT diff | низкий приоритет |
+| J | Включать mpss | не делать без отдельной задачи |
+
+Дальше по желанию: упаковать system-WCNSS в `firmware-asus-z00e`, поправить MAC/`02:00:…` через NV, проверить соединение (не только scan).
+
+## Автономный контур oneshot
+
+`scripts/fastboot-oneshot-test.sh`, `scripts/pack-boot-oneshot.sh`. Vol Up=fastboot, Vol Down=TWRP. Default extlinux — `#9`.
+
+## Диагностика
+
+`scripts/wifi-bt-modem-diag.sh` / `/usr/local/bin/wifi-bt-modem-diag.sh`.

@@ -193,7 +193,10 @@ diff -Naur orig/arch/arm64/boot/dts/qcom/msm8916-asus-z00e.dts new/arch/arm64/bo
 +};
 +
 +&wcnss_mem {
-+	/* The signed WCNSS image is linked at 0x8b600000. */
++	/* Signed WCNSS ELF links at 0x8b600000 (relocatable). Dynamic CMA
++	 * also works; modem vs Android-system firmware matters more than
++	 * the carveout address for PAS_INIT_IMAGE on this unit.
++	 */
 +	/delete-property/ size;
 +	/delete-property/ alignment;
 +	/delete-property/ alloc-ranges;

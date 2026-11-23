@@ -2,12 +2,18 @@
 
 Устройство одно: ASUS Zenfone 2 Laser ZE500KL (`ASUS_Z00ED`, плата `ASUS_Z00E_2`). Это не Z00L и не Z00T. Чужие платы, GPIO и регуляторы оттуда не копировать.
 
+Сейчас на нём Linux: **Nura edge** (Alpine/postmarketOS), hostname `z00e`, ядро `6.12.1-msm8916 #9`, UI — **Phosh + phoc** (Wayland `wayland-0`, XWayland `:1`). Экран 720×1280. Пользователь сессии `user` (uid `10000`).
+
 ## Как попасть на устройство
 
 - ADB, когда телефон ещё на Android: `adb -s 138f09fb`. Другие устройства по ADB не трогать.
 - Linux по USB-сети: телефон `172.16.42.1`, хост `172.16.42.2`. Имя интерфейса `enx…` меняется каждый раз. Логин `user`, пароль `1234`, sudo тем же паролем. `dmesg` только через sudo.
-- Пинг на `172.16.42.1` без привязки к USB-интерфейсу уходит в VPN `happ-xray`. Проверять маршрут.
-- USB-гаджет Linux — это `18d1:d001`. Fastboot — `18d1:d00d`. `18d1:d001` не считать режимом fastboot.
+- Пинг на `172.16.42.1` без привязки к USB-интерфейсу уходит в VPN `happ-xray`. Проверять `ip route get 172.16.42.1` и пинговать с `-I enx…` / `-b 172.16.42.2` у SSH.
+- USB-гаджет Linux раньше был `18d1:d001`. На текущей Nura в режиме tethering/NCM встречается `1d6b:0103` (Linux Foundation NCM) и интерфейс `enx…`. Fastboot — `18d1:d00d`. Ни `18d1:d001`, ни `1d6b:0103` не считать fastboot.
+- В UI USB есть режимы вроде Developer / tethering; для сети нужен **data-кабель**. Зарядный-only в `lsusb` телефона не показывает. После смены режима полезно переткнуть кабель.
+- NetworkManager на хосте часто вешает на `enx…` только link-local `169.254…/16` (`ipv4.method=link-local`). Тогда вручную: `ip addr add 172.16.42.2/24 dev enx…`. На телефоне адрес `usb0` = `172.16.42.1/16`.
+- У телефона по умолчанию нет маршрута в интернет (только USB). Для `apk`/`npm`: на хосте IP forward + MASQUERADE с `172.16.42.0/24` в uplink (у нас уходил в `happ-xray`), на телефоне `ip route replace default via 172.16.42.2` и DNS через `resolvectl dns usb0 1.1.1.1`.
+- GUI с SSH: `XDG_RUNTIME_DIR=/run/user/10000`, `WAYLAND_DISPLAY=wayland-0`, `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus`, `DISPLAY=:1`. Скриншот: `grim`.
 
 ## Два разных fastboot
 
@@ -18,7 +24,7 @@
 
 Перед любой записью прочитать серийник и product. `fastboot getvar` по неверному серийнику зависает: такие процессы убивать до настоящей прошивки.
 
-`reboot bootloader` из Linux попадает в стоковый aboot, не в lk2nd. Удержание уменьшения громкости во время старта lk2nd оставляет lk2nd в своём fastboot. У lk2nd нет таймаута extlinux: неизвестные строки пропускаются, сразу грузится метка `default`.
+`reboot bootloader` из Linux попадает в стоковый aboot, не в lk2nd. При холодном включении с зажатой кнопкой: **Vol Up → fastboot**, **Vol Down → TWRP** (recovery `mmcblk0p35`). Без кнопок — обычная загрузка Linux через lk2nd/extlinux. У lk2nd нет таймаута extlinux: неизвестные строки пропускаются, сразу грузится метка `default`.
 
 ## Что нельзя прошивать
 
@@ -37,8 +43,19 @@
 
 ## Wi-Fi
 
-Не повторять эксперимент `lowbounce`: подмена метаданных PAS обычной страницей линейного отображения вешает TrustZone, держит мьютекс SCM и блокирует sshd. Не вызывать `mem_setup` на память, которой пользуется Linux. Не делать второй alias поверх кэшируемой страницы. Разбор того, что уже опровергнуто, — в `docs/WIFI.md`.
+Рабочий набор — **Android `system` `/etc/firmware/wcnss.*`**, не modem/`msm-firmware-loader`. Modem-сборка даёт `PAS_INIT_IMAGE` `-22`. На устройстве: файлы в `/usr/lib/firmware/wcnss.*` + `z00e-wcnss-fw.service` (очищает `firmware_class.path`). Копия в репо: `firmware/wcnss-android-system/`.
+
+Не повторять `lowbounce` / `mem_setup` по RAM Linux. Подробности и опровергнутые гипотезы — `docs/WIFI.md`.
+
+## Графика и приложения на Phosh
+
+- GPU — Adreno 306 (freedreno GL/GLES/EGL есть). **Vulkan на железе нет** (Turnip только a6xx+). `mesa-vulkan-swrast` (lavapipe) ставится, но нативному `Window` из `skia-canvas` этого мало: «No suitable physical device found».
+- Hello World на Node+Skia: репозиторий `apps/hello-skia/`, на телефоне `~/apps/hello-skia/`. Рисование — `skia-canvas` (CPU), окно — GTK4 Wayland (`presenter.py`). Лончер: `eco.nura.HelloSkia.desktop`.
+- У Phosh **app-id окна должен совпадать с basename `.desktop`** и быть reverse-DNS (`eco.nura.HelloSkia`). Иначе в журнале: `Could not find application for app-id '…'`, окно может не подняться поверх текущего UI. `hello-skia` как GApplication id невалиден (нужна точка). GTK: `app.run(sys.argv)`, не `run(None)`.
+- Для GUI из SSH удобнее `gio launch ~/.local/share/applications/eco.nura.HelloSkia.desktop`, чем голый `node` без сессионных переменных.
 
 ## Сборка
 
 Ядро для прошивки собирать pmbootstrap/Alpine clang. Системный clang Debian (19) даёт несовместимые модули. Команда, которой собирался пакет: `pmbootstrap -j2 build linux-postmarketos-qcom-msm8916`.
+
+Пакеты на телефоне — через `apk` (edge/Nura mirrors). Node: `apk add nodejs npm`. Нативная `skia-canvas` тянет prebuild `@skia-canvas/linux-arm64-musl`.
