@@ -51,12 +51,19 @@
 
 Нужен **QDSP6 через MSS** (`msm8916-modem-qdsp6.dtsi` в DTS). Без запущенного `4080000.remoteproc` карты ALSA нет. На устройстве: `z00e-modem-fw-link.service` (линки `mba.mbn`/`modem.*` из раздела modem в `/lib/firmware`) и `z00e-start-mss.service`. Скрипты в репо: `scripts/z00e-modem-fw-link.sh`, `scripts/z00e-start-mss.sh`. Рабочий DTB: `images/msm8916-asus-z00e-audio.dtb` (на телефоне `/boot/msm8916-asus-z00e.dtb`). Pulse: профиль `HiFi (Mic1, Speaker)`.
 
-## Графика и приложения на Phosh
+## Киоск (Cage) вместо Phosh
 
-- GPU — Adreno 306 (freedreno GL/GLES/EGL есть). **Vulkan на железе нет** (Turnip только a6xx+). `mesa-vulkan-swrast` (lavapipe) ставится, но нативному `Window` из `skia-canvas` этого мало: «No suitable physical device found».
-- Hello World на Node+Skia: репозиторий `apps/hello-skia/`, на телефоне `~/apps/hello-skia/`. Рисование — `skia-canvas` (CPU), окно — GTK4 Wayland (`presenter.py`). Лончер: `eco.nura.HelloSkia.desktop`.
-- У Phosh **app-id окна должен совпадать с basename `.desktop`** и быть reverse-DNS (`eco.nura.HelloSkia`). Иначе в журнале: `Could not find application for app-id '…'`, окно может не подняться поверх текущего UI. `hello-skia` как GApplication id невалиден (нужна точка). GTK: `app.run(sys.argv)`, не `run(None)`.
-- Для GUI из SSH удобнее `gio launch ~/.local/share/applications/eco.nura.HelloSkia.desktop`, чем голый `node` без сессионных переменных.
+Целевой UI: **`postmarketos-ui-cage` + `tinydm`** (autologin uid `10000`), без пароля и без OSK. Сессия: `/usr/share/wayland-sessions/cage-ui.desktop`. Команда киоска: `/etc/cage-ui/10-hello-skia.sh` → `CAGE_UI_COMMAND=/home/user/apps/hello-skia/run.sh`. Установка: `scripts/z00e-kiosk-setup.sh`.
+
+Откат на Phosh: `tinydm-set-session -s /usr/share/wayland-sessions/phosh.desktop`, `systemctl unmask/enable greetd`, `disable tinydm`, reboot.
+
+Wi‑Fi после смены UI: соединения NetworkManager должны быть **system** (`connection.permissions` пустой), иначе без графической сессии `wlan0` не поднимется.
+
+## Графика и приложения
+
+- GPU — Adreno 306 (**Freedreno GLES/EGL**, renderer `FD307`). **Vulkan на железе нет** (Turnip только a6xx+). `skia-canvas` Window/`gpu:true` без Vulkan не взлетит.
+- Hello World: `apps/hello-skia/` → на телефоне `~/apps/hello-skia/`. По умолчанию **GLES** (`presenter_gl.py`); fallback CPU Skia: `HELLO_SKIA_BACKEND=skia-cpu`.
+- Для Phosh (если вернули): app-id = basename `.desktop` = `eco.nura.HelloSkia`.
 
 ## Сборка
 

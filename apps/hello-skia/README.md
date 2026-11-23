@@ -1,26 +1,35 @@
-# Hello Skia
+# Hello Skia (kiosk)
 
-Node.js hello-world for Phosh on ASUS Zenfone 2 Laser (`z00e` / Nura edge).
+Node.js hello-world for ASUS Zenfone 2 Laser (`z00e` / Nura edge), meant to run under **Cage**.
 
 | Layer | Tech |
 | --- | --- |
-| Graphics | [skia-canvas](https://skia-canvas.org) (Skia, CPU) |
-| Window | GTK4 Wayland (`presenter.py`) |
+| Default render | GTK4 `GLArea` + OpenGL ES on **Freedreno FD307** (GPU) |
+| Fallback | `HELLO_SKIA_BACKEND=skia-cpu` → skia-canvas CPU + `presenter.py` |
+| Window / session | Cage kiosk (`postmarketos-ui-cage` + tinydm autologin) |
 
-`skia-canvas`’s native `Window` needs Vulkan. Adreno 306 has no Vulkan (and lavapipe is rejected by the window path), so frames are drawn with Skia and presented by GTK.
+`skia-canvas` native `Window` / `{ gpu: true }` needs **Vulkan**. Adreno 306 has none, so the kiosk path draws the scene with GLES (gradient + orb on GPU; text atlas uploaded once).
 
 ## On the phone
 
 ```sh
 cd ~/apps/hello-skia
-npm install
-npm run icon
 ./run.sh
 ```
 
-Launcher entry: `~/.local/share/applications/eco.nura.HelloSkia.desktop`  
-(App id must be reverse-DNS and match the `.desktop` basename.)
+Env:
 
-## Host notes
+- `HELLO_SKIA_BACKEND=gles` (default) or `skia-cpu`
+- `HELLO_SKIA_TAP_QUIT=1` to quit on tap (off in kiosk)
 
-Phone USB net is `172.16.42.1`; host needs `172.16.42.2` on `enx…` (NetworkManager may only give link-local). Internet for `apk`/`npm` was shared via host NAT.
+Kiosk setup (root): `scripts/z00e-kiosk-setup.sh`
+
+## Rollback to Phosh
+
+```sh
+sudo tinydm-set-session -s /usr/share/wayland-sessions/phosh.desktop
+sudo systemctl unmask greetd
+sudo systemctl enable --now greetd
+sudo systemctl disable tinydm
+sudo reboot
+```
