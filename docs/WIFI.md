@@ -6,7 +6,7 @@
 
 На modem-наборе TrustZone отклоняет `PAS_INIT_IMAGE` (PAS id 6) → `error -22`. На system-наборе: `remoteproc0` → `running`, `wcn36xx` поднимает `wlan0`, `btqcomsmd` → `hci0`. Скан сетей через NetworkManager успешен.
 
-Модем (MSS/`mpss`) в DTB по-прежнему **выключен** (отдельная тема / риск EDL).
+Модем (MSS/`mpss`) **включён для QDSP6-аудио** (`mpss` @ `0x86800000` size `0x5500000`). `wcnss_mem` закреплён на `0x8bd00000`, чтобы не пересекаться с mpss. EDL при обычном старте MSS не наблюдался.
 
 ## Рабочая конфигурация (2026-11-23)
 
@@ -15,9 +15,10 @@
 | Прошивка | Android system `wcnss.mdt` + `.b00`…`.b11` в `/usr/lib/firmware/` |
 | `firmware_class.path` | **пустой** (не `/run/msm-firmware-loader/target`) |
 | Сервис | `z00e-wcnss-fw.service` (после `msm-firmware-loader`) |
-| `remoteproc0` | `running`, WCNSS Version 1.5 1.2 |
+| WCNSS remoteproc | `running`, WCNSS Version 1.5 1.2 |
 | `wlan0` | up, scan OK (например SSID вокруг телефона видны) |
 | `hci0` | powered on |
+| MSS / аудио | `4080000.remoteproc` running; ALSA card `msm8916`, Speaker через UCM |
 
 Копия рабочих блобов: [`firmware/wcnss-android-system/`](../firmware/wcnss-android-system/)  
 SHA256 `wcnss.mdt` (system): `c7e793ff6968cc92effaaa1d3b3bdd93e74126a12173133e8968ffcbb4be8bb4`  
@@ -45,7 +46,7 @@ ELF обоих наборов линкуется на `0x8b600000` (relocatable)
 | G | Metadata phys / XPU | отложено (не нужно при system-fw) |
 | H | Iris/XO до PAS | отложено |
 | I | Z00L DT diff | низкий приоритет |
-| J | Включать mpss | не делать без отдельной задачи |
+| J | Включать mpss | сделано для аудио; `wcnss_mem` → `0x8bd00000` |
 
 Дальше по желанию: упаковать system-WCNSS в `firmware-asus-z00e`, поправить MAC/`02:00:…` через NV, проверить соединение (не только scan).
 

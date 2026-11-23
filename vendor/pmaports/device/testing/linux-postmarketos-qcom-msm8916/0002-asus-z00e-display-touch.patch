@@ -12,12 +12,13 @@ diff -Naur orig/arch/arm64/boot/dts/qcom/Makefile new/arch/arm64/boot/dts/qcom/M
 diff -Naur orig/arch/arm64/boot/dts/qcom/msm8916-asus-z00e.dts new/arch/arm64/boot/dts/qcom/msm8916-asus-z00e.dts
 --- orig/arch/arm64/boot/dts/qcom/msm8916-asus-z00e.dts	1970-01-01 04:00:00.000000000 +0400
 +++ new/arch/arm64/boot/dts/qcom/msm8916-asus-z00e.dts	2026-10-23 12:27:27.926313793 +0400
-@@ -0,0 +1,259 @@
+@@ -0,0 +1,282 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/dts-v1/;
 +
 +#include "msm8916-pm8916.dtsi"
++#include "msm8916-modem-qdsp6.dtsi"
 +
 +#include <dt-bindings/gpio/gpio.h>
 +#include <dt-bindings/input/input.h>
@@ -193,15 +194,34 @@ diff -Naur orig/arch/arm64/boot/dts/qcom/msm8916-asus-z00e.dts new/arch/arm64/bo
 +};
 +
 +&wcnss_mem {
-+	/* Signed WCNSS ELF links at 0x8b600000 (relocatable). Dynamic CMA
-+	 * also works; modem vs Android-system firmware matters more than
-+	 * the carveout address for PAS_INIT_IMAGE on this unit.
++	/* Keep WCNSS after mpss (0x86800000+0x5500000=0x8bd00000) so modem
++	 * audio (QDSP6) and Wi-Fi carveouts do not overlap. Android-system
++	 * WCNSS firmware is relocatable.
 +	 */
 +	/delete-property/ size;
 +	/delete-property/ alignment;
 +	/delete-property/ alloc-ranges;
-+	reg = <0x0 0x8b600000 0x0 0x600000>;
++	reg = <0x0 0x8bd00000 0x0 0x600000>;
 +	status = "okay";
++};
++
++&mpss_mem {
++	reg = <0x0 0x86800000 0x0 0x5500000>;
++};
++
++&pm8916_codec {
++	qcom,micbias-lvl = <2800>;
++	qcom,mbhc-vthreshold-low = <75 150 237 450 500>;
++	qcom,mbhc-vthreshold-high = <75 150 237 450 500>;
++	qcom,micbias1-ext-cap;
++	qcom,hphl-jack-type-normally-open;
++};
++
++&sound {
++	audio-routing =
++		"AMIC1", "MIC BIAS External1",
++		"AMIC2", "MIC BIAS Internal2",
++		"AMIC3", "MIC BIAS External1";
 +};
 +
 +&tlmm {

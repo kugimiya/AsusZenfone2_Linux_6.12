@@ -45,7 +45,11 @@
 
 Рабочий набор — **Android `system` `/etc/firmware/wcnss.*`**, не modem/`msm-firmware-loader`. Modem-сборка даёт `PAS_INIT_IMAGE` `-22`. На устройстве: файлы в `/usr/lib/firmware/wcnss.*` + `z00e-wcnss-fw.service` (очищает `firmware_class.path`). Копия в репо: `firmware/wcnss-android-system/`.
 
-Не повторять `lowbounce` / `mem_setup` по RAM Linux. Подробности и опровергнутые гипотезы — `docs/WIFI.md`.
+`wcnss_mem` в DTB: `0x8bd00000` (после `mpss`), не `0x8b6…` — иначе пересечение с модемом для аудио. Не повторять `lowbounce` / `mem_setup` по RAM Linux. Подробности — `docs/WIFI.md`.
+
+## Аудио / динамики
+
+Нужен **QDSP6 через MSS** (`msm8916-modem-qdsp6.dtsi` в DTS). Без запущенного `4080000.remoteproc` карты ALSA нет. На устройстве: `z00e-modem-fw-link.service` (линки `mba.mbn`/`modem.*` из раздела modem в `/lib/firmware`) и `z00e-start-mss.service`. Скрипты в репо: `scripts/z00e-modem-fw-link.sh`, `scripts/z00e-start-mss.sh`. Рабочий DTB: `images/msm8916-asus-z00e-audio.dtb` (на телефоне `/boot/msm8916-asus-z00e.dtb`). Pulse: профиль `HiFi (Mic1, Speaker)`.
 
 ## Графика и приложения на Phosh
 
