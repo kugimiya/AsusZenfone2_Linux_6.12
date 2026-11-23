@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Hello Skia
+Comment=Hello World with skia-canvas
+Exec=/home/user/apps/hello-skia/run.sh
+Icon=/home/user/apps/hello-skia/icons/hello-skia.png
+Terminal=false
+Categories=Graphics;Education;
+StartupNotify=true
+StartupWMClass=eco.nura.HelloSkia
+X-Purism-FormFactor=Workstation;Mobile;
